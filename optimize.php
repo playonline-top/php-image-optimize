@@ -20,54 +20,50 @@ if (!function_exists('str_contains')) {
     }
 }
 
-// Disallow search engines from indexing thumbnails
+// Headers: search engines, block cross origin
 header("X-Robots-Tag: noindex");
-
-// Block cross-origin requests (optional)
 header("Cross-Origin-Resource-Policy: same-site");
 
 // Require an image
-if($_GET['url']==null){
+if ($_GET['url'] == null) {
     http_response_code(400);
     die("An image URL must be provided");
 }
-// Limit to GM URLs
-if(!str_contains($_GET['url'],'https://img.gamemonetize.com/')){
+
+// Limit to GameMonetize URLs
+if (!str_contains($_GET['url'], 'https://img.gamemonetize.com/')) {
     http_response_code(400);
     die("You are only allowed to provide GameMonetize URLs!");
 }
 
 // Wrap everything in a try-catch
-try{
+try {
+    // Construct image object
+    $gdimage = imagecreatefromjpeg($_GET['url']);
+    
+    if (!$gdimage) {
+        $gdimage = imagecreatefromstring(file_get_contents($_GET['url']));
+    }
 
-// Construct image
-$gdimage=imagecreatefromjpeg($_GET['url']);
-if (!$gdimage)
-{
-    $gdimage=imagecreatefromstring(file_get_contents($_GET['url']));
-}
+    // Catch if object doesn't construct
+    if ($gdimage == false) {
+        http_response_code(500);
+        die("An error occurred while optimising the image.");
+    }
 
-// Jpeg function may return false if it could not construct, so catch that
-if($gdimage==false){
+    // Scale image down to 256x192
+    $output = imagescale($gdimage, 256);
+
+    // Headers: image type, caching
+    header("Content-Type: image/webp");
+    header("Cache-Control: public; must-revalidate; max-age=86400; stale-while-revalidate=604800; stale-if-error=604800");
+
+    // Serve the image with 60% quality
+    imagewebp($output, null, 60);
+} catch (Exception $e) {
+    // Catch any errors with generic 500 response
     http_response_code(500);
     die("An error occurred while optimising the image.");
 }
 
-// Scale down to 256x192
-$output=imagescale($gdimage,256);
-
-// Indicate that this is an image
-header("Content-Type: image/webp");
-
-// Set up caching parameters
-header("Cache-Control: public; must-revalidate; max-age=86400; stale-while-revalidate=604800; stale-if-error=604800");
-
-// Serve the image in WEBP with 60% quality
-imagewebp($output,null,60);
-
-}catch(Exception $e){
-    //Display generic error
-    http_response_code(500);
-    die("An error occurred while optimising the image.");
-}
 ?>
